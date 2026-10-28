@@ -1,0 +1,13 @@
+{
+  "name": "babylife",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Siri 음성으로 육아 기록(분유, 직수, 유축, 수면 등)을 남기는 웹앱",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0"
+  }
+}

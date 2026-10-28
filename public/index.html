@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="육아기록">
+<meta name="theme-color" content="#f6f4f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17181a" media="(prefers-color-scheme: dark)">
+<title>육아 기록</title>
+<style>
+  :root {
+    --bg: #f6f4f1; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73; --line: #e6e2dc;
+    --accent: #3b5bdb; --danger: #d6336c;
+    --c-formula: #f08c00; --c-breast: #e64980; --c-breast_stored: #ae3ec9; --c-pumping: #7048e8;
+    --c-sleep: #1c7ed6; --c-diaper: #2f9e44; --c-baby_food: #e8590c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a; --card: #222326; --text: #f2f2f2; --muted: #a0a0a6; --line: #34353a;
+      --accent: #748ffc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 8px; }
+  h1 { font-size: 22px; margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { border: 0; border-radius: 12px; padding: 10px 14px; background: var(--card); cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { color: var(--danger); }
+  button.icon { padding: 8px 12px; background: transparent; font-size: 20px; }
+  .card { background: var(--card); border-radius: 16px; padding: 14px; margin: 12px 0; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 6px 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
+  .chip[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .datenav { display: flex; align-items: center; justify-content: space-between; }
+  .datenav strong { font-size: 17px; }
+  input, select, textarea {
+    width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--bg); min-width: 0;
+  }
+  .quick input { flex: 1; }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 2px 0; }
+  .msg { font-size: 14px; margin-top: 8px; }
+  .msg.err { color: var(--danger); }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat { background: var(--card); border-radius: 14px; padding: 12px; }
+  .stat .label { color: var(--muted); font-size: 13px; }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .stat .sub { color: var(--muted); font-size: 12px; }
+  ul.timeline { list-style: none; margin: 0; padding: 0; }
+  ul.timeline li {
+    display: grid; grid-template-columns: 64px 1fr; gap: 10px; padding: 12px 4px;
+    border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  ul.timeline li:last-child { border-bottom: 0; }
+  .time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .title { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+  dialog {
+    border: 0; border-radius: 18px; padding: 18px; width: min(520px, calc(100vw - 32px));
+    background: var(--card); color: var(--text);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  .form { display: grid; gap: 10px; }
+  .form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .actions { display: flex; gap: 8px; justify-content: space-between; margin-top: 6px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="login" class="card" hidden>
+    <h1>육아 기록</h1>
+    <p class="hint">Vercel에 설정한 API_TOKEN을 입력하세요. 이 기기에만 저장됩니다.</p>
+    <form id="loginForm" class="row" style="margin-top:10px">
+      <input id="tokenInput" type="password" autocomplete="current-password" placeholder="API 토큰" required>
+      <button class="primary">확인</button>
+    </form>
+    <p id="loginMsg" class="msg err"></p>
+  </section>
+
+  <div id="app" hidden>
+    <header>
+      <h1>육아 기록</h1>
+      <button class="icon" id="addBtn" aria-label="직접 추가">＋</button>
+    </header>
+
+    <div class="chips" id="babyChips"></div>
+
+    <form class="card quick" id="quickForm">
+      <div class="row">
+        <input id="quickInput" placeholder="예) 땡땡이 분유 50미리 5시 15분부터 40분까지" enterkeyhint="send">
+        <button class="primary">기록</button>
+      </div>
+      <p class="hint">키보드의 🎤 받아쓰기로 말해도 됩니다.</p>
+      <p id="quickMsg" class="msg"></p>
+    </form>
+
+    <div class="card datenav">
+      <button class="icon" id="prevDay" aria-label="이전 날">‹</button>
+      <strong id="dateLabel"></strong>
+      <button class="icon" id="nextDay" aria-label="다음 날">›</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <ul class="timeline" id="timeline"></ul>
+    </div>
+  </div>
+</main>
+
+<dialog id="editor">
+  <form class="form" id="editForm" method="dialog">
+    <strong id="editTitle">기록 수정</strong>
+    <div class="grid2">
+      <label>아기<select name="baby" id="fBaby"></select></label>
+      <label>카테고리<select name="category" id="fCategory"></select></label>
+    </div>
+    <div class="grid2">
+      <label>양<input name="amount" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label>단위<select name="unit"><option>ml</option><option>g</option></select></label>
+    </div>
+    <label>시작<input name="startAt" type="datetime-local" required></label>
+    <label>종료<input name="endAt" type="datetime-local"></label>
+    <label>메모<textarea name="memo" rows="2"></textarea></label>
+    <p id="editMsg" class="msg err"></p>
+    <div class="actions">
+      <button type="button" class="danger" id="deleteBtn">삭제</button>
+      <div class="row">
+        <button type="button" id="cancelBtn">취소</button>
+        <button class="primary" id="saveBtn">저장</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+const $ = (id) => document.getElementById(id);
+const state = { token: store.get('token'), meta: null, baby: store.get('baby'), date: new Date(), records: [], editing: null };
+const FEEDS = ['formula', 'breast', 'breast_stored', 'baby_food'];
+const SIDE = { left: '왼쪽', right: '오른쪽', both: '양쪽' };
+const DIAPER = { pee: '소변', poo: '대변', both: '소변+대변' };
+const SLEEP = { nap: '낮잠', night: '밤잠' };
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.token}`, ...(options.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({ ok: false, message: `서버 응답 오류 (${res.status})` }));
+  if (res.status === 401) { logout(data.message); throw new Error(data.message); }
+  if (!res.ok || data.ok === false) throw new Error(data.message || `오류 (${res.status})`);
+  return data;
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const hm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const toLocalInput = (iso) => { if (!iso) return ''; const d = new Date(iso); return `${ymd(d)}T${hm(d)}`; };
+const catOf = (key) => state.meta.categories.find((c) => c.key === key) || { key, label: key };
+function fmtDuration(min) {
+  if (min < 60) return `${min}분`;
+  return `${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ''}`;
+}
+const minutesBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 60000);
+
+function logout(message) {
+  store.del('token');
+  state.token = null;
+  $('app').hidden = true;
+  $('login').hidden = false;
+  $('loginMsg').textContent = message || '';
+}
+
+async function start() {
+  if (!state.token) return logout();
+  try {
+    state.meta = await api('/api/meta');
+  } catch (e) {
+    if (state.token) { $('login').hidden = false; $('loginMsg').textContent = e.message; }
+    return;
+  }
+  if (!state.meta.babies.includes(state.baby)) state.baby = state.meta.babies[0];
+  $('login').hidden = true;
+  $('app').hidden = false;
+  renderBabies();
+  fillSelects();
+  await load();
+}
+
+function renderBabies() {
+  const wrap = $('babyChips');
+  wrap.hidden = state.meta.babies.length < 2;
+  wrap.replaceChildren(...state.meta.babies.map((name) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = name;
+    b.setAttribute('aria-pressed', String(name === state.baby));
+    b.onclick = () => { state.baby = name; store.set('baby', name); renderBabies(); load(); };
+    return b;
+  }));
+}
+
+function fillSelects() {
+  $('fBaby').replaceChildren(...state.meta.babies.map((n) => new Option(n, n)));
+  $('fCategory').replaceChildren(...state.meta.categories.map((c) => new Option(c.label, c.key)));
+}
+
+async function load() {
+  const today = ymd(new Date());
+  const date = ymd(state.date);
+  $('dateLabel').textContent = date === today ? '오늘' : `${state.date.getMonth() + 1}월 ${state.date.getDate()}일 (${'일월화수목금토'[state.date.getDay()]})`;
+  $('nextDay').disabled = date >= today;
+  try {
+    const params = new URLSearchParams({ date, baby: state.baby });
+    state.records = (await api(`/api/records?${params}`)).records;
+  } catch (e) {
+    state.records = [];
+    $('timeline').innerHTML = `<li class="empty">${e.message}</li>`;
+    return;
+  }
+  renderStats();
+  renderTimeline();
+}
+
+function stat(label, value, sub = '') {
+  return `<div class="stat"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
+}
+
+function renderStats() {
+  const rs = state.records;
+  const dayStart = new Date(ymd(state.date) + 'T00:00').getTime();
+  const dayEnd = dayStart + 86400000;
+  const sumMl = (keys) => rs.filter((r) => keys.includes(r.category) && r.unit === 'ml').reduce((s, r) => s + (r.amount || 0), 0);
+  const count = (keys) => rs.filter((r) => keys.includes(r.category)).length;
+  // 자정을 넘긴 수면은 이날에 해당하는 부분만 더한다.
+  const sleepMin = rs.filter((r) => r.category === 'sleep' && r.endAt).reduce((s, r) => {
+    const a = Math.max(new Date(r.startAt).getTime(), dayStart);
+    const b = Math.min(new Date(r.endAt).getTime(), dayEnd);
+    return s + Math.max(0, Math.round((b - a) / 60000));
+  }, 0);
+
+  let since = '';
+  const lastFeed = rs.find((r) => FEEDS.includes(r.category));
+  if (lastFeed && ymd(state.date) === ymd(new Date())) {
+    since = `마지막 수유 ${fmtDuration(Math.max(0, minutesBetween(lastFeed.endAt || lastFeed.startAt, new Date())))} 전`;
+  }
+  $('stats').innerHTML = [
+    stat('수유', `${count(FEEDS)}회`, since),
+    stat('분유 + 모유저장유', `${sumMl(['formula', 'breast_stored'])}ml`, `분유 ${sumMl(['formula'])} · 저장유 ${sumMl(['breast_stored'])}`),
+    stat('수면', sleepMin ? fmtDuration(sleepMin) : '-', `${count(['sleep'])}회`),
+    stat('기저귀 / 유축', `${count(['diaper'])}회`, `유축 ${sumMl(['pumping'])}ml`),
+  ].join('');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderTimeline() {
+  const ul = $('timeline');
+  if (!state.records.length) { ul.innerHTML = '<li class="empty">기록이 없어요</li>'; return; }
+  ul.innerHTML = state.records.map((r, i) => {
+    const cat = catOf(r.category);
+    const bits = [];
+    if (r.amount != null) bits.push(`${r.amount}${r.unit || ''}`);
+    const d = r.detail || {};
+    if (d.side) bits.push(SIDE[d.side]);
+    if (d.leftMin != null) bits.push(`왼 ${d.leftMin}분`);
+    if (d.rightMin != null) bits.push(`오 ${d.rightMin}분`);
+    if (d.diaper) bits.push(DIAPER[d.diaper]);
+    const s = new Date(r.startAt);
+    let time = hm(s);
+    if (r.endAt) {
+      time += `<br>~${hm(new Date(r.endAt))}`;
+      bits.push(fmtDuration(minutesBetween(r.startAt, r.endAt)));
+    }
+    const otherDay = ymd(s) !== ymd(state.date) ? ' (전날)' : '';
+    return `<li data-i="${i}">
+      <div class="time">${time}${otherDay}</div>
+      <div>
+        <div class="title"><span class="dot" style="background:var(--c-${cat.key}, var(--accent))"></span>${escapeHtml(SLEEP[d.sleepType] || cat.label)} ${escapeHtml(bits.join(' · '))}</div>
+        ${r.memo ? `<div class="meta">${escapeHtml(r.memo)}</div>` : ''}
+      </div>
+    </li>`;
+  }).join('');
+  ul.querySelectorAll('li[data-i]').forEach((li) => { li.onclick = () => openEditor(state.records[li.dataset.i]); });
+}
+
+function openEditor(record) {
+  state.editing = record || null;
+  const f = $('editForm');
+  const r = record || { baby: state.baby, category: 'formula', amount: '', unit: 'ml', startAt: new Date().toISOString(), endAt: null, memo: '' };
+  $('editTitle').textContent = record ? '기록 수정' : '직접 추가';
+  f.baby.value = r.baby;
+  f.category.value = r.category;
+  f.amount.value = r.amount ?? '';
+  f.unit.value = r.unit || catOf(r.category).unit || 'ml';
+  f.startAt.value = toLocalInput(r.startAt);
+  f.endAt.value = toLocalInput(r.endAt);
+  f.memo.value = r.memo || '';
+  $('deleteBtn').hidden = !record;
+  $('editMsg').textContent = '';
+  $('editor').showModal();
+}
+
+$('editForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = ev.target;
+  const body = {
+    baby: f.baby.value,
+    category: f.category.value,
+    amount: f.amount.value === '' ? null : Number(f.amount.value),
+    unit: f.unit.value,
+    startAt: new Date(f.startAt.value).toISOString(),
+    endAt: f.endAt.value ? new Date(f.endAt.value).toISOString() : null,
+    detail: state.editing?.detail || {},
+    memo: f.memo.value || null,
+  };
+  try {
+    if (state.editing) await api(`/api/records?id=${state.editing.id}`, { method: 'PUT', body: JSON.stringify(body) });
+    else await api('/api/records', { method: 'POST', body: JSON.stringify(body) });
+    $('editor').close();
+    load();
+  } catch (e) { $('editMsg').textContent = e.message; }
+});
+
+$('deleteBtn').onclick = async () => {
+  if (!state.editing || !confirm('이 기록을 삭제할까요?')) return;
+  try {
+    await api(`/api/records?id=${state.editing.id}`, { method: 'DELETE' });
+    $('editor').close();
+    load();
+  } catch (e) { $('editMsg').textContent = e.message; }
+};
+$('cancelBtn').onclick = () => $('editor').close();
+$('fCategory').onchange = (ev) => { const u = catOf(ev.target.value).unit; if (u) $('editForm').unit.value = u; };
+$('addBtn').onclick = () => openEditor(null);
+
+$('quickForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const input = $('quickInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const msg = $('quickMsg');
+  msg.className = 'msg';
+  msg.textContent = '기록 중…';
+  try {
+    const data = await api('/api/records', { method: 'POST', body: JSON.stringify({ text }) });
+    msg.textContent = data.message;
+    input.value = '';
+    state.date = new Date(data.record.startAt);
+    load();
+  } catch (e) {
+    msg.className = 'msg err';
+    msg.textContent = e.message;
+  }
+});
+
+$('prevDay').onclick = () => { state.date = new Date(state.date.getTime() - 86400000); load(); };
+$('nextDay').onclick = () => { state.date = new Date(state.date.getTime() + 86400000); load(); };
+
+$('loginForm').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  state.token = $('tokenInput').value.trim();
+  store.set('token', state.token);
+  start();
+});
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.meta) load(); });
+start();
+</script>
+</body>
+</html>
